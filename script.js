@@ -93,9 +93,10 @@ function render(){
   $('#today').innerHTML=companyToggle();
   $('#companySelect').onchange=e=>{currentCompany=e.target.value;localStorage.setItem('guideline-current-company',currentCompany);if(!company().hasJobOrders&&view==='joborders')view='dashboard';drawNav();render()};
   drawNav();
+  const pages={dashboard,clients,suppliers,materials,quotations,projects,joborders,requests,requestNew,purchases,labour,reports};
   const nav=activeNav(), active=nav.find(x=>x[0]===view)||nav[0];
-  $('#pageTitle').textContent=active[2];
-  $('#app').innerHTML=companyBanner()+({dashboard,clients,suppliers,materials,quotations,projects,joborders,requests,purchases,labour,reports})[view]();
+  $('#pageTitle').textContent=view==='requestNew'?'New Purchase Request':active[2];
+  $('#app').innerHTML=companyBanner()+(pages[view]||pages[active[0]])();
   bindForms();
 }
 function companyBanner(){
@@ -137,6 +138,20 @@ function joborders(){
 function requests(){
   const linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
   return `<section class="card form-card"><div class="section-head"><h2>Purchase request — ${company().name}</h2></div><form id="prForm" class="form-grid"><label>PR no.<input name="no" required placeholder="PR-8002"></label>${linkField}<label>Date<input name="date" type="date" value="${today()}" required></label><label>Requested by<input name="requestedBy"></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Material code<select name="materialId" required>${materialOptions()}</select></label><label>Amount<input name="amount" type="number" step="0.01" required></label><label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label><label class="wide">Items / materials<textarea name="item" required></textarea></label><button class="btn">Add purchase request</button></form></section><section class="card">${requestTable(scoped('purchaseRequests'))}</section>`;
+}
+function requests(){
+  return `<section class="card"><div class="section-head"><div><h2>Purchase Requests</h2><p style="margin:4px 0 0;color:var(--muted)">Review existing requests, print them, or create a new PR on a separate screen.</p></div><button class="btn" data-new-request>New Purchase Request</button></div>${requestTable(scoped('purchaseRequests'))}</section>`;
+}
+function requestNew(){
+  const linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
+  return `<section class="card form-card"><div class="section-head"><div><h2>Create Purchase Request — ${company().name}</h2><small>Follows the company PR form.</small></div><button class="ghost" type="button" data-back-requests>Back to PR list</button></div><form id="prForm" class="form-grid"><label>PR no.<input name="no" required placeholder="PR-8002"></label>${linkField}<label>BOQ item #<input name="boqItemNo"></label><label>Issue date<input name="date" type="date" value="${today()}" required></label><label>Date required<input name="dateRequired" type="date"></label><label>Requested by<input name="requestedBy"></label><label>Project manager / engineer<input name="projectManager"></label><label>Store manager<input name="storeManager"></label><label>No. of labors<input name="noOfLabors" type="number"></label><label>Duration estimate (days)<input name="durationDays" type="number"></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>${lineItemsTable('pr',10)}<label class="wide">Comments<textarea name="comments"></textarea></label><div class="wide actions"><button class="btn">Save Purchase Request</button><button class="ghost" type="button" data-back-requests>Cancel</button></div></form></section>`;
+}
+function requests(){
+  return `<section class="card"><div class="section-head"><div><h2>Purchase Requests</h2><p style="margin:4px 0 0;color:var(--muted)">Review existing requests, print them, or create a new PR on a separate screen.</p></div><button class="btn" data-new-request>New Purchase Request</button></div>${requestTable(scoped('purchaseRequests'))}</section>`;
+}
+function requestNew(){
+  const linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
+  return `<section class="card form-card"><div class="section-head"><div><h2>Create Purchase Request — ${company().name}</h2><small>Follows the company PR form.</small></div><button class="ghost" type="button" data-back-requests>Back to PR list</button></div><form id="prForm" class="form-grid"><label>PR no.<input name="no" required placeholder="PR-8002"></label>${linkField}<label>BOQ item #<input name="boqItemNo"></label><label>Issue date<input name="date" type="date" value="${today()}" required></label><label>Date required<input name="dateRequired" type="date"></label><label>Requested by<input name="requestedBy"></label><label>Project manager / engineer<input name="projectManager"></label><label>Store manager<input name="storeManager"></label><label>No. of labors<input name="noOfLabors" type="number"></label><label>Duration estimate (days)<input name="durationDays" type="number"></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>${lineItemsTable('pr',10)}<label class="wide">Comments<textarea name="comments"></textarea></label><div class="wide actions"><button class="btn">Save Purchase Request</button><button class="ghost" type="button" data-back-requests>Cancel</button></div></form></section>`;
 }
 function purchases(){
   const prs=scoped('purchaseRequests'), linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
@@ -291,4 +306,48 @@ function bindForms(){
 }
 function remove(collection,id){if(confirm('Remove this record?')){db[collection]=db[collection].filter(x=>x.id!==id);save();render();toast('Removed')}}
 function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),1800)}
+function requests(){
+  return `<section class="card"><div class="section-head"><div><h2>Purchase Requests</h2><p style="margin:4px 0 0;color:var(--muted)">Review existing requests, print them, or create a new PR on a separate screen.</p></div><button class="btn" data-new-request>New Purchase Request</button></div>${requestTable(scoped('purchaseRequests'))}</section>`;
+}
+function requestNew(){
+  const linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
+  return `<section class="card form-card"><div class="section-head"><div><h2>Create Purchase Request — ${company().name}</h2><small>Follows the company PR form.</small></div><button class="ghost" type="button" data-back-requests>Back to PR list</button></div><form id="prForm" class="form-grid"><label>PR no.<input name="no" required placeholder="PR-8002"></label>${linkField}<label>BOQ item #<input name="boqItemNo"></label><label>Issue date<input name="date" type="date" value="${today()}" required></label><label>Date required<input name="dateRequired" type="date"></label><label>Requested by<input name="requestedBy"></label><label>Project manager / engineer<input name="projectManager"></label><label>Store manager<input name="storeManager"></label><label>No. of labors<input name="noOfLabors" type="number"></label><label>Duration estimate (days)<input name="durationDays" type="number"></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>${lineItemsTable('pr',10)}<label class="wide">Comments<textarea name="comments"></textarea></label><div class="wide actions"><button class="btn">Save Purchase Request</button><button class="ghost" type="button" data-back-requests>Cancel</button></div></form></section>`;
+}
+function bindForms(){
+  const bind=(id,fn)=>{const f=$(id);if(f)f.onsubmit=e=>{e.preventDefault();fn(Object.fromEntries(new FormData(f)));save();render();toast('Saved')}};
+  bind('#clientForm',d=>db.clients.unshift({...d,id:uid('c'),companyId:currentCompany,status:trnStatus(d.trn)}));
+  bind('#supplierForm',d=>db.suppliers.unshift({...d,id:uid('s'),companyId:currentCompany,status:trnStatus(d.trn)}));
+  bind('#materialForm',d=>db.materialCodes.unshift({...d,id:uid('m')}));
+  bind('#materialImportForm',d=>{(d.rows||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(row=>{const [code,description,category,unit]=row.split(',').map(x=>x?.trim()||'');if(code&&description)db.materialCodes.push({id:uid('m'),code,description,category,unit})})});
+  bind('#quotationForm',d=>db.quotations.unshift({...d,id:uid('q'),companyId:currentCompany,client:client(d.clientId).name||'',amount:+d.amount}));
+  bind('#projectForm',d=>db.projects.unshift({...d,id:uid('p'),companyId:currentCompany,client:client(d.clientId).name||'',budget:+d.budget}));
+  bind('#jobForm',d=>{
+    const form=$('#jobForm'), scopeTypes=[...form.querySelectorAll('[name="scopeType"]:checked')].map(x=>x.value), descriptions=collectDescriptions(d,'jo',8);
+    db.jobOrders.unshift({...d,id:uid('j'),companyId:currentCompany,fromCompany:currentCompany,toCompany:currentCompany,quotedValue:+d.quotedValue||0,scopeTypes,descriptions,attachments:{shopDrawingNo:d.shopDrawingNo||'',sample:d.sample||'',supportingDoc:d.supportingDoc||'',revision:d.revision||''}});
+  });
+  bind('#prForm',d=>{
+    const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId, lines=collectLines(d,'pr',10), amount=lines.reduce((s,x)=>s+(+x.amount||0),0), first=lines[0]||{};
+    db.purchaseRequests.unshift({...d,id:uid('pr'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',supplier:supplier(d.supplierId).name||'',materialId:first.materialId||'',item:first.description||'',lines,amount});
+    view='requests';
+  });
+  bind('#purchaseForm',d=>{
+    const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId, lines=collectLines(d,'lpo',8), amount=lines.reduce((s,x)=>s+(+x.amount||0),0);
+    db.purchases.unshift({...d,id:uid('po'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',supplier:supplier(d.supplierId).name||'',lines,amount});
+  });
+  bind('#labourForm',d=>{const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId;db.labour.unshift({...d,id:uid('l'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',hours:+d.hours,rate:+d.rate})});
+  document.querySelectorAll('[data-new-request]').forEach(b=>b.onclick=()=>{view='requestNew';render()});
+  document.querySelectorAll('[data-back-requests]').forEach(b=>b.onclick=()=>{view='requests';render()});
+  document.querySelectorAll('[data-create-project]').forEach(b=>b.onclick=()=>{const q=quotation(b.dataset.createProject);db.projects.unshift({id:uid('p'),companyId:currentCompany,quotationId:q.id,no:company().prefix+'-P-'+Date.now().toString().slice(-4),name:q.scope.slice(0,45),clientId:q.clientId,client:client(q.clientId).name||q.client,start:today(),status:'Active',budget:+q.amount||0});save();view='projects';render();toast('Project created from approved quotation')});
+  document.querySelectorAll('[name*="Material"]').forEach(select=>select.onchange=()=>{const row=select.closest('tr'),m=material(select.value);if(row){const desc=row.querySelector('[name*="Desc"]'),unit=row.querySelector('[name*="Unit"]');if(desc&&!desc.value)desc.value=m.description||'';if(unit&&!unit.value)unit.value=m.unit||''}});
+  document.querySelectorAll('.validate-trn').forEach(b=>b.onclick=()=>{const input=b.closest('form')?.querySelector('[name="trn"]'),status=trnStatus(input?.value);toast(status==='Valid'?'TRN format is valid':'TRN must be 15 digits')});
+  document.querySelectorAll('[data-delete-client]').forEach(b=>b.onclick=()=>remove('clients',b.dataset.deleteClient));
+  document.querySelectorAll('[data-delete-supplier]').forEach(b=>b.onclick=()=>remove('suppliers',b.dataset.deleteSupplier));
+  document.querySelectorAll('[data-delete-material]').forEach(b=>b.onclick=()=>remove('materialCodes',b.dataset.deleteMaterial));
+  document.querySelectorAll('[data-delete-quotation]').forEach(b=>b.onclick=()=>remove('quotations',b.dataset.deleteQuotation));
+  document.querySelectorAll('[data-delete-job]').forEach(b=>b.onclick=()=>remove('jobOrders',b.dataset.deleteJob));
+  document.querySelectorAll('[data-delete-pr]').forEach(b=>b.onclick=()=>remove('purchaseRequests',b.dataset.deletePr));
+  document.querySelectorAll('[data-delete-purchase]').forEach(b=>b.onclick=()=>remove('purchases',b.dataset.deletePurchase));
+  document.querySelectorAll('[data-delete-labour]').forEach(b=>b.onclick=()=>remove('labour',b.dataset.deleteLabour));
+  addPrintableButtons();
+}
 init();
