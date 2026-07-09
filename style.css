@@ -14,3 +14,10 @@
 .form-grid .comments-field textarea{min-height:86px}
 .form-grid .payment-field,.form-grid .terms-field{grid-column:1/-1;display:grid}
 .form-grid .terms-field textarea{min-height:86px}
+.pr-word-format{max-width:760px;padding:10px}
+.pr-word-format .form-table th,.pr-word-format .form-table td{font-size:8.5px;padding:3px 4px!important}
+.pr-word-format .side-title{width:120px}
+.pr-word-format .side-title h2{font-size:18px;line-height:1.05;margin:0 0 12px}
+.pr-word-format .checkbox-row{gap:8px}
+.pr-word-format .checkbox-row label{font-size:7.5px}
+.pr-word-format .checkbox-row span{width:22px;height:22px}
