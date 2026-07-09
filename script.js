@@ -93,9 +93,9 @@ function render(){
   $('#today').innerHTML=companyToggle();
   $('#companySelect').onchange=e=>{currentCompany=e.target.value;localStorage.setItem('guideline-current-company',currentCompany);if(!company().hasJobOrders&&view==='joborders')view='dashboard';drawNav();render()};
   drawNav();
-  const pages={dashboard,clients,suppliers,materials,quotations,projects,joborders,requests,requestNew,purchases,labour,reports};
+  const pages={dashboard,clients,suppliers,materials,quotations,projects,joborders,jobNew,requests,requestNew,purchases,purchaseNew,labour,reports};
   const nav=activeNav(), active=nav.find(x=>x[0]===view)||nav[0];
-  $('#pageTitle').textContent=view==='requestNew'?'New Purchase Request':active[2];
+  $('#pageTitle').textContent=view==='requestNew'?'New Purchase Request':view==='jobNew'?'New Job Order':view==='purchaseNew'?'New LPO / Purchase':active[2];
   $('#app').innerHTML=companyBanner()+(pages[view]||pages[active[0]])();
   bindForms();
 }
@@ -337,6 +337,66 @@ function bindForms(){
   bind('#labourForm',d=>{const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId;db.labour.unshift({...d,id:uid('l'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',hours:+d.hours,rate:+d.rate})});
   document.querySelectorAll('[data-new-request]').forEach(b=>b.onclick=()=>{view='requestNew';render()});
   document.querySelectorAll('[data-back-requests]').forEach(b=>b.onclick=()=>{view='requests';render()});
+  document.querySelectorAll('[data-create-project]').forEach(b=>b.onclick=()=>{const q=quotation(b.dataset.createProject);db.projects.unshift({id:uid('p'),companyId:currentCompany,quotationId:q.id,no:company().prefix+'-P-'+Date.now().toString().slice(-4),name:q.scope.slice(0,45),clientId:q.clientId,client:client(q.clientId).name||q.client,start:today(),status:'Active',budget:+q.amount||0});save();view='projects';render();toast('Project created from approved quotation')});
+  document.querySelectorAll('[name*="Material"]').forEach(select=>select.onchange=()=>{const row=select.closest('tr'),m=material(select.value);if(row){const desc=row.querySelector('[name*="Desc"]'),unit=row.querySelector('[name*="Unit"]');if(desc&&!desc.value)desc.value=m.description||'';if(unit&&!unit.value)unit.value=m.unit||''}});
+  document.querySelectorAll('.validate-trn').forEach(b=>b.onclick=()=>{const input=b.closest('form')?.querySelector('[name="trn"]'),status=trnStatus(input?.value);toast(status==='Valid'?'TRN format is valid':'TRN must be 15 digits')});
+  document.querySelectorAll('[data-delete-client]').forEach(b=>b.onclick=()=>remove('clients',b.dataset.deleteClient));
+  document.querySelectorAll('[data-delete-supplier]').forEach(b=>b.onclick=()=>remove('suppliers',b.dataset.deleteSupplier));
+  document.querySelectorAll('[data-delete-material]').forEach(b=>b.onclick=()=>remove('materialCodes',b.dataset.deleteMaterial));
+  document.querySelectorAll('[data-delete-quotation]').forEach(b=>b.onclick=()=>remove('quotations',b.dataset.deleteQuotation));
+  document.querySelectorAll('[data-delete-job]').forEach(b=>b.onclick=()=>remove('jobOrders',b.dataset.deleteJob));
+  document.querySelectorAll('[data-delete-pr]').forEach(b=>b.onclick=()=>remove('purchaseRequests',b.dataset.deletePr));
+  document.querySelectorAll('[data-delete-purchase]').forEach(b=>b.onclick=()=>remove('purchases',b.dataset.deletePurchase));
+  document.querySelectorAll('[data-delete-labour]').forEach(b=>b.onclick=()=>remove('labour',b.dataset.deleteLabour));
+  addPrintableButtons();
+}
+function joborders(){
+  if(!company().hasJobOrders)return `<section class="card"><h2>No job order module for ${company().name}</h2><p>Costs for this company are linked directly to projects.</p></section>`;
+  return `<section class="card"><div class="section-head"><div><h2>Job Orders</h2><p style="margin:4px 0 0;color:var(--muted)">Review issued factory job orders or create a new JO on a separate screen.</p></div><button class="btn" data-new-job>New Job Order</button></div></section><section class="grid three">${scoped('jobOrders').map(j=>`<article class="card job-card"><div class="section-head"><div><h2>${j.no}</h2><span class="badge factory">${company().name}</span></div><div class="actions"><button class="ghost" data-print-doc="job:${j.id}">Print</button><button class="danger-link" data-delete-job="${j.id}">Remove</button></div></div><p><b>Project:</b> ${project(j.projectId).name||'—'}</p><p>${j.scope||'—'}</p><p><b>Required:</b> ${j.requiredDate||'—'} · <b>BOQ:</b> ${j.boqItemNo||'—'}</p><table><tbody><tr><td>Materials</td><td class="money">${money(jobMaterialCost(j.id))}</td></tr><tr><td>Labour</td><td class="money">${money(jobLabourCost(j.id))}</td></tr><tr><td>Other</td><td class="money">${money(jobExpenseCost(j.id))}</td></tr></tbody></table><p><span class="badge ${String(j.status||'issued').toLowerCase().replaceAll(' ','-')}">${j.status||'Issued'}</span></p></article>`).join('')||'<section class="card empty">No job orders yet.</section>'}</section>`;
+}
+function jobNew(){
+  if(!company().hasJobOrders)return joborders();
+  const scopes=['JOINERY (1)','JOINERY (2)','PAINT','CNC','EXTERNAL','INSTALLATION','GYPSUM'];
+  return `<section class="card form-card"><div class="section-head"><div><h2>Create Job Order — ${company().name}</h2><small>Follows the company Job Order process.</small></div><button class="ghost" type="button" data-back-jobs>Back to Job Order list</button></div><form id="jobForm" class="form-grid"><label>Ref / JO no.<input name="no" required placeholder="${company().prefix}-JO-501"></label><label>Project<select name="projectId" required>${projectOptions()}</select></label><label>Issue date<input name="date" type="date" value="${today()}" required></label><label>Required date<input name="requiredDate" type="date"></label><label>Prepared by<input name="preparedBy"></label><label>Area<input name="area"></label><label>BOQ item no.<input name="boqItemNo"></label><label>Value / budget<input name="quotedValue" type="number" step="0.01"></label><label>Status<select name="status"><option>Issued</option><option>In Production</option><option>Delivered</option><option>Closed</option></select></label><label class="wide">Scope / remarks<textarea name="scope" required></textarea></label><div class="wide check-list"><b>Scope of work</b>${scopes.map(s=>`<label><input type="checkbox" name="scopeType" value="${s}"> ${s}</label>`).join('')}</div>${descriptionRows('jo',8)}<label>Shop drawing no.<input name="shopDrawingNo"></label><label>Sample<input name="sample"></label><label>Supporting doc.<input name="supportingDoc"></label><label>Revision<input name="revision"></label><div class="wide actions"><button class="btn">Save Job Order</button><button class="ghost" type="button" data-back-jobs>Cancel</button></div></form></section>`;
+}
+function purchases(){
+  const rows=scoped('purchases');
+  return `<section class="card"><div class="section-head"><div><h2>LPO / Purchases</h2><p style="margin:4px 0 0;color:var(--muted)">Review LPOs and cash purchases, or create a new LPO on a separate screen.</p></div><button class="btn" data-new-purchase>New LPO / Purchase</button></div><table><thead><tr><th>Ref</th><th>PR</th><th>${company().hasJobOrders?'Job order':'Project'}</th><th>Supplier</th><th>LPO?</th><th>Amount</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td><b>${p.no}</b><br><small>${p.date}</small></td><td>${pr(p.prId).no||'—'}</td><td>${company().hasJobOrders?(job(p.jobOrderId).no||'—'):(project(p.projectId).name||'—')}</td><td>${supplier(p.supplierId).name||p.supplier||'—'}</td><td><span class="badge">${p.hasLpo||'Yes'}</span></td><td class="money">${money(p.amount)}</td><td><button class="ghost" data-print-doc="lpo:${p.id}">Print</button> <button class="danger-link" data-delete-purchase="${p.id}">Remove</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">No LPO / purchases yet.</td></tr>'}</tbody></table></section>`;
+}
+function purchaseNew(){
+  const prs=scoped('purchaseRequests'), linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
+  return `<section class="card form-card"><div class="section-head"><div><h2>Create LPO / Purchase — ${company().name}</h2><small>Follows the Local Purchase Order process.</small></div><button class="ghost" type="button" data-back-purchases>Back to LPO list</button></div><form id="purchaseForm" class="form-grid"><label>LPO / Ref no.<input name="no" required placeholder="LPO-3002 or Cash"></label><label>Purchase request<select name="prId">${prs.map(r=>`<option value="${r.id}">${r.no} · ${(r.item||'').slice(0,35)}</option>`).join('')}<option value="">No PR</option></select></label>${linkField}<label>Date<input name="date" type="date" value="${today()}" required></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Contact person<input name="contactPerson"></label><label>Completion time<input name="completionTime"></label><label>With LPO?<select name="hasLpo"><option>Yes</option><option>No</option></select></label><label>Status<select name="status"><option>Issued</option><option>Delivered</option><option>Paid</option></select></label>${lineItemsTable('lpo',8)}<label>Payment terms<input name="paymentTerms" value="120 Days PDC"></label><label class="wide">Terms and conditions<textarea name="terms"></textarea></label><div class="wide actions"><button class="btn">Save LPO / Purchase</button><button class="ghost" type="button" data-back-purchases>Cancel</button></div></form></section>`;
+}
+function bindForms(){
+  const bind=(id,fn)=>{const f=$(id);if(f)f.onsubmit=e=>{e.preventDefault();fn(Object.fromEntries(new FormData(f)));save();render();toast('Saved')}};
+  bind('#clientForm',d=>db.clients.unshift({...d,id:uid('c'),companyId:currentCompany,status:trnStatus(d.trn)}));
+  bind('#supplierForm',d=>db.suppliers.unshift({...d,id:uid('s'),companyId:currentCompany,status:trnStatus(d.trn)}));
+  bind('#materialForm',d=>db.materialCodes.unshift({...d,id:uid('m')}));
+  bind('#materialImportForm',d=>{(d.rows||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(row=>{const [code,description,category,unit]=row.split(',').map(x=>x?.trim()||'');if(code&&description)db.materialCodes.push({id:uid('m'),code,description,category,unit})})});
+  bind('#quotationForm',d=>db.quotations.unshift({...d,id:uid('q'),companyId:currentCompany,client:client(d.clientId).name||'',amount:+d.amount}));
+  bind('#projectForm',d=>db.projects.unshift({...d,id:uid('p'),companyId:currentCompany,client:client(d.clientId).name||'',budget:+d.budget}));
+  bind('#jobForm',d=>{
+    const form=$('#jobForm'), scopeTypes=[...form.querySelectorAll('[name="scopeType"]:checked')].map(x=>x.value), descriptions=collectDescriptions(d,'jo',8);
+    db.jobOrders.unshift({...d,id:uid('j'),companyId:currentCompany,fromCompany:currentCompany,toCompany:currentCompany,quotedValue:+d.quotedValue||0,scopeTypes,descriptions,attachments:{shopDrawingNo:d.shopDrawingNo||'',sample:d.sample||'',supportingDoc:d.supportingDoc||'',revision:d.revision||''}});
+    view='joborders';
+  });
+  bind('#prForm',d=>{
+    const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId, lines=collectLines(d,'pr',10), amount=lines.reduce((s,x)=>s+(+x.amount||0),0), first=lines[0]||{};
+    db.purchaseRequests.unshift({...d,id:uid('pr'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',supplier:supplier(d.supplierId).name||'',materialId:first.materialId||'',item:first.description||'',lines,amount});
+    view='requests';
+  });
+  bind('#purchaseForm',d=>{
+    const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId, lines=collectLines(d,'lpo',8), amount=lines.reduce((s,x)=>s+(+x.amount||0),0);
+    db.purchases.unshift({...d,id:uid('po'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',supplier:supplier(d.supplierId).name||'',lines,amount});
+    view='purchases';
+  });
+  bind('#labourForm',d=>{const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId;db.labour.unshift({...d,id:uid('l'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',hours:+d.hours,rate:+d.rate})});
+  document.querySelectorAll('[data-new-job]').forEach(b=>b.onclick=()=>{view='jobNew';render()});
+  document.querySelectorAll('[data-back-jobs]').forEach(b=>b.onclick=()=>{view='joborders';render()});
+  document.querySelectorAll('[data-new-request]').forEach(b=>b.onclick=()=>{view='requestNew';render()});
+  document.querySelectorAll('[data-back-requests]').forEach(b=>b.onclick=()=>{view='requests';render()});
+  document.querySelectorAll('[data-new-purchase]').forEach(b=>b.onclick=()=>{view='purchaseNew';render()});
+  document.querySelectorAll('[data-back-purchases]').forEach(b=>b.onclick=()=>{view='purchases';render()});
   document.querySelectorAll('[data-create-project]').forEach(b=>b.onclick=()=>{const q=quotation(b.dataset.createProject);db.projects.unshift({id:uid('p'),companyId:currentCompany,quotationId:q.id,no:company().prefix+'-P-'+Date.now().toString().slice(-4),name:q.scope.slice(0,45),clientId:q.clientId,client:client(q.clientId).name||q.client,start:today(),status:'Active',budget:+q.amount||0});save();view='projects';render();toast('Project created from approved quotation')});
   document.querySelectorAll('[name*="Material"]').forEach(select=>select.onchange=()=>{const row=select.closest('tr'),m=material(select.value);if(row){const desc=row.querySelector('[name*="Desc"]'),unit=row.querySelector('[name*="Unit"]');if(desc&&!desc.value)desc.value=m.description||'';if(unit&&!unit.value)unit.value=m.unit||''}});
   document.querySelectorAll('.validate-trn').forEach(b=>b.onclick=()=>{const input=b.closest('form')?.querySelector('[name="trn"]'),status=trnStatus(input?.value);toast(status==='Valid'?'TRN format is valid':'TRN must be 15 digits')});
