@@ -198,6 +198,38 @@ function printableDocument(type,id){
   let holder=$('#printDocument');if(!holder){holder=document.createElement('div');holder.id='printDocument';document.body.appendChild(holder)}
   holder.innerHTML=html;document.body.classList.add('show-print-doc');$('#closePrintDoc').onclick=()=>document.body.classList.remove('show-print-doc');$('#printNow').onclick=()=>window.print();
 }
+function lineItemsTable(prefix,count=5){
+  return `<div class="wide line-entry"><b>Line items</b><table><thead><tr><th>Material code</th><th>Description</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Remarks</th></tr></thead><tbody>${Array.from({length:count},(_,i)=>{const n=i+1;return `<tr><td><select name="${prefix}Material${n}"><option value="">Select</option>${materialOptions()}</select></td><td><input name="${prefix}Desc${n}"></td><td><input name="${prefix}Qty${n}" type="number" step="0.01"></td><td><input name="${prefix}Unit${n}"></td><td><input name="${prefix}Rate${n}" type="number" step="0.01"></td><td><input name="${prefix}Remarks${n}"></td></tr>`}).join('')}</tbody></table></div>`;
+}
+function descriptionRows(prefix,count=8){
+  return `<div class="wide line-entry"><b>Description rows</b><table><thead><tr><th>No.</th><th>Description</th><th>Dimension</th><th>Qty</th></tr></thead><tbody>${Array.from({length:count},(_,i)=>{const n=i+1;return `<tr><td>${n}</td><td><input name="${prefix}Desc${n}"></td><td><input name="${prefix}Dimension${n}"></td><td><input name="${prefix}Qty${n}" type="number" step="0.01"></td></tr>`}).join('')}</tbody></table></div>`;
+}
+function collectLines(data,prefix,count=5){
+  const rows=[];
+  for(let i=1;i<=count;i++){
+    const materialId=data[`${prefix}Material${i}`]||'', m=material(materialId), desc=data[`${prefix}Desc${i}`]||m.description||'', qty=+(data[`${prefix}Qty${i}`]||0), unit=data[`${prefix}Unit${i}`]||m.unit||'', rate=+(data[`${prefix}Rate${i}`]||0), remarks=data[`${prefix}Remarks${i}`]||'';
+    if(materialId||desc||qty||rate||remarks)rows.push({materialId,code:m.code||'',description:desc,category:m.category||'',qty,unit,rate,amount:qty&&rate?qty*rate:0,remarks});
+  }
+  return rows;
+}
+function collectDescriptions(data,prefix,count=8){
+  const rows=[];
+  for(let i=1;i<=count;i++){const description=data[`${prefix}Desc${i}`]||'',dimension=data[`${prefix}Dimension${i}`]||'',qty=data[`${prefix}Qty${i}`]||'';if(description||dimension||qty)rows.push({description,dimension,qty})}
+  return rows;
+}
+function joborders(){
+  if(!company().hasJobOrders)return `<section class="card"><h2>No job order module for ${company().name}</h2><p>Costs for this company are linked directly to projects.</p></section>`;
+  const scopes=['JOINERY (1)','JOINERY (2)','PAINT','CNC','EXTERNAL','INSTALLATION','GYPSUM'];
+  return `<section class="card form-card"><div class="section-head"><h2>Create job order — ${company().name}</h2><small>Follows the company Job Order form.</small></div><form id="jobForm" class="form-grid"><label>Ref / JO no.<input name="no" required placeholder="${company().prefix}-JO-501"></label><label>Project<select name="projectId" required>${projectOptions()}</select></label><label>Issue date<input name="date" type="date" value="${today()}" required></label><label>Required date<input name="requiredDate" type="date"></label><label>Prepared by<input name="preparedBy"></label><label>Area<input name="area"></label><label>BOQ item no.<input name="boqItemNo"></label><label>Value / budget<input name="quotedValue" type="number" step="0.01"></label><label>Status<select name="status"><option>Issued</option><option>In Production</option><option>Delivered</option><option>Closed</option></select></label><label class="wide">Scope / remarks<textarea name="scope" required></textarea></label><div class="wide check-list"><b>Scope of work</b>${scopes.map(s=>`<label><input type="checkbox" name="scopeType" value="${s}"> ${s}</label>`).join('')}</div>${descriptionRows('jo',8)}<label>Shop drawing no.<input name="shopDrawingNo"></label><label>Sample<input name="sample"></label><label>Supporting doc.<input name="supportingDoc"></label><label>Revision<input name="revision"></label><button class="btn">Create job order</button></form></section><section class="grid three">${scoped('jobOrders').map(j=>`<article class="card job-card"><div class="section-head"><div><h2>${j.no}</h2><span class="badge factory">${company().name}</span></div><button class="danger-link" data-delete-job="${j.id}">Remove</button></div><p><b>Project:</b> ${project(j.projectId).name||'—'}</p><p>${j.scope}</p><p><b>Required:</b> ${j.requiredDate||'—'} · <b>BOQ:</b> ${j.boqItemNo||'—'}</p><table><tbody><tr><td>Materials</td><td class="money">${money(jobMaterialCost(j.id))}</td></tr><tr><td>Labour</td><td class="money">${money(jobLabourCost(j.id))}</td></tr><tr><td>Other</td><td class="money">${money(jobExpenseCost(j.id))}</td></tr></tbody></table><p><span class="badge ${j.status.toLowerCase().replaceAll(' ','-')}">${j.status}</span></p></article>`).join('')||'<section class="card empty">No job orders yet.</section>'}</section>`;
+}
+function requests(){
+  const linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
+  return `<section class="card form-card"><div class="section-head"><h2>Purchase request — ${company().name}</h2><small>Follows the company PR form.</small></div><form id="prForm" class="form-grid"><label>PR no.<input name="no" required placeholder="PR-8002"></label>${linkField}<label>BOQ item #<input name="boqItemNo"></label><label>Issue date<input name="date" type="date" value="${today()}" required></label><label>Date required<input name="dateRequired" type="date"></label><label>Requested by<input name="requestedBy"></label><label>Project manager / engineer<input name="projectManager"></label><label>Store manager<input name="storeManager"></label><label>No. of labors<input name="noOfLabors" type="number"></label><label>Duration estimate (days)<input name="durationDays" type="number"></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>${lineItemsTable('pr',10)}<label class="wide">Comments<textarea name="comments"></textarea></label><button class="btn">Add purchase request</button></form></section><section class="card">${requestTable(scoped('purchaseRequests'))}</section>`;
+}
+function purchases(){
+  const prs=scoped('purchaseRequests'), linkField=company().hasJobOrders?`<label>Job order<select name="jobOrderId" required>${jobOptions()}</select></label>`:`<label>Project<select name="projectId" required>${projectOptions()}</select></label>`;
+  return `<section class="card form-card"><div class="section-head"><h2>LPO / purchase — ${company().name}</h2><small>Follows the Local Purchase Order process.</small></div><form id="purchaseForm" class="form-grid"><label>LPO / Ref no.<input name="no" required placeholder="LPO-3002 or Cash"></label><label>Purchase request<select name="prId">${prs.map(r=>`<option value="${r.id}">${r.no} · ${(r.item||'').slice(0,35)}</option>`).join('')}<option value="">No PR</option></select></label>${linkField}<label>Date<input name="date" type="date" value="${today()}" required></label><label>Vendor / supplier<select name="supplierId" required>${supplierOptions()}</select></label><label>Contact person<input name="contactPerson"></label><label>Completion time<input name="completionTime"></label><label>With LPO?<select name="hasLpo"><option>Yes</option><option>No</option></select></label><label>Status<select name="status"><option>Issued</option><option>Delivered</option><option>Paid</option></select></label>${lineItemsTable('lpo',8)}<label>Payment terms<input name="paymentTerms" value="120 Days PDC"></label><label class="wide">Terms and conditions<textarea name="terms"></textarea></label><button class="btn">Add LPO / purchase</button></form></section><section class="card"><table><thead><tr><th>Ref</th><th>PR</th><th>${company().hasJobOrders?'Job order':'Project'}</th><th>Supplier</th><th>LPO?</th><th>Amount</th><th></th></tr></thead><tbody>${scoped('purchases').map(p=>`<tr><td><b>${p.no}</b><br><small>${p.date}</small></td><td>${pr(p.prId).no||'—'}</td><td>${company().hasJobOrders?(job(p.jobOrderId).no||'—'):(project(p.projectId).name||'—')}</td><td>${supplier(p.supplierId).name||p.supplier||'—'}</td><td><span class="badge">${p.hasLpo}</span></td><td class="money">${money(p.amount)}</td><td><button class="danger-link" data-delete-purchase="${p.id}">Remove</button></td></tr>`).join('')}</tbody></table></section>`;
+}
 function bindForms(){
   const bind=(id,fn)=>{const f=$(id);if(f)f.onsubmit=e=>{e.preventDefault();fn(Object.fromEntries(new FormData(f)));save();render();toast('Saved')}};
   bind('#clientForm',d=>db.clients.unshift({...d,id:uid('c'),companyId:currentCompany,status:trnStatus(d.trn)}));
@@ -212,6 +244,40 @@ function bindForms(){
   bind('#labourForm',d=>{const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId;db.labour.unshift({...d,id:uid('l'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',hours:+d.hours,rate:+d.rate})});
   document.querySelectorAll('[data-create-project]').forEach(b=>b.onclick=()=>{const q=quotation(b.dataset.createProject);db.projects.unshift({id:uid('p'),companyId:currentCompany,quotationId:q.id,no:company().prefix+'-P-'+Date.now().toString().slice(-4),name:q.scope.slice(0,45),clientId:q.clientId,client:client(q.clientId).name||q.client,start:today(),status:'Active',budget:+q.amount||0});save();view='projects';render();toast('Project created from approved quotation')});
   const materialSelect=document.querySelector('[name="materialId"]');if(materialSelect)materialSelect.onchange=()=>{const m=material(materialSelect.value),item=document.querySelector('[name="item"]');if(item&&!item.value)item.value=`${m.code||''} - ${m.description||''}`.trim()};
+  document.querySelectorAll('.validate-trn').forEach(b=>b.onclick=()=>{const input=b.closest('form')?.querySelector('[name="trn"]'),status=trnStatus(input?.value);toast(status==='Valid'?'TRN format is valid':'TRN must be 15 digits')});
+  document.querySelectorAll('[data-delete-client]').forEach(b=>b.onclick=()=>remove('clients',b.dataset.deleteClient));
+  document.querySelectorAll('[data-delete-supplier]').forEach(b=>b.onclick=()=>remove('suppliers',b.dataset.deleteSupplier));
+  document.querySelectorAll('[data-delete-material]').forEach(b=>b.onclick=()=>remove('materialCodes',b.dataset.deleteMaterial));
+  document.querySelectorAll('[data-delete-quotation]').forEach(b=>b.onclick=()=>remove('quotations',b.dataset.deleteQuotation));
+  document.querySelectorAll('[data-delete-job]').forEach(b=>b.onclick=()=>remove('jobOrders',b.dataset.deleteJob));
+  document.querySelectorAll('[data-delete-pr]').forEach(b=>b.onclick=()=>remove('purchaseRequests',b.dataset.deletePr));
+  document.querySelectorAll('[data-delete-purchase]').forEach(b=>b.onclick=()=>remove('purchases',b.dataset.deletePurchase));
+  document.querySelectorAll('[data-delete-labour]').forEach(b=>b.onclick=()=>remove('labour',b.dataset.deleteLabour));
+  addPrintableButtons();
+}
+function bindForms(){
+  const bind=(id,fn)=>{const f=$(id);if(f)f.onsubmit=e=>{e.preventDefault();fn(Object.fromEntries(new FormData(f)));save();render();toast('Saved')}};
+  bind('#clientForm',d=>db.clients.unshift({...d,id:uid('c'),companyId:currentCompany,status:trnStatus(d.trn)}));
+  bind('#supplierForm',d=>db.suppliers.unshift({...d,id:uid('s'),companyId:currentCompany,status:trnStatus(d.trn)}));
+  bind('#materialForm',d=>db.materialCodes.unshift({...d,id:uid('m')}));
+  bind('#materialImportForm',d=>{(d.rows||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(row=>{const [code,description,category,unit]=row.split(',').map(x=>x?.trim()||'');if(code&&description)db.materialCodes.push({id:uid('m'),code,description,category,unit})})});
+  bind('#quotationForm',d=>db.quotations.unshift({...d,id:uid('q'),companyId:currentCompany,client:client(d.clientId).name||'',amount:+d.amount}));
+  bind('#projectForm',d=>db.projects.unshift({...d,id:uid('p'),companyId:currentCompany,client:client(d.clientId).name||'',budget:+d.budget}));
+  bind('#jobForm',d=>{
+    const form=$('#jobForm'), scopeTypes=[...form.querySelectorAll('[name="scopeType"]:checked')].map(x=>x.value), descriptions=collectDescriptions(d,'jo',8);
+    db.jobOrders.unshift({...d,id:uid('j'),companyId:currentCompany,fromCompany:currentCompany,toCompany:currentCompany,quotedValue:+d.quotedValue||0,scopeTypes,descriptions,attachments:{shopDrawingNo:d.shopDrawingNo||'',sample:d.sample||'',supportingDoc:d.supportingDoc||'',revision:d.revision||''}});
+  });
+  bind('#prForm',d=>{
+    const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId, lines=collectLines(d,'pr',10), amount=lines.reduce((s,x)=>s+(+x.amount||0),0), first=lines[0]||{};
+    db.purchaseRequests.unshift({...d,id:uid('pr'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',supplier:supplier(d.supplierId).name||'',materialId:first.materialId||'',item:first.description||'',lines,amount});
+  });
+  bind('#purchaseForm',d=>{
+    const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId, lines=collectLines(d,'lpo',8), amount=lines.reduce((s,x)=>s+(+x.amount||0),0);
+    db.purchases.unshift({...d,id:uid('po'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',supplier:supplier(d.supplierId).name||'',lines,amount});
+  });
+  bind('#labourForm',d=>{const projectId=company().hasJobOrders?job(d.jobOrderId).projectId:d.projectId;db.labour.unshift({...d,id:uid('l'),companyId:currentCompany,projectId,jobOrderId:d.jobOrderId||'',hours:+d.hours,rate:+d.rate})});
+  document.querySelectorAll('[data-create-project]').forEach(b=>b.onclick=()=>{const q=quotation(b.dataset.createProject);db.projects.unshift({id:uid('p'),companyId:currentCompany,quotationId:q.id,no:company().prefix+'-P-'+Date.now().toString().slice(-4),name:q.scope.slice(0,45),clientId:q.clientId,client:client(q.clientId).name||q.client,start:today(),status:'Active',budget:+q.amount||0});save();view='projects';render();toast('Project created from approved quotation')});
+  document.querySelectorAll('[name$="Material1"]').forEach(select=>select.onchange=()=>{const row=select.closest('tr'),m=material(select.value);if(row){const desc=row.querySelector('[name*="Desc"]'),unit=row.querySelector('[name*="Unit"]');if(desc&&!desc.value)desc.value=m.description||'';if(unit&&!unit.value)unit.value=m.unit||''}});
   document.querySelectorAll('.validate-trn').forEach(b=>b.onclick=()=>{const input=b.closest('form')?.querySelector('[name="trn"]'),status=trnStatus(input?.value);toast(status==='Valid'?'TRN format is valid':'TRN must be 15 digits')});
   document.querySelectorAll('[data-delete-client]').forEach(b=>b.onclick=()=>remove('clients',b.dataset.deleteClient));
   document.querySelectorAll('[data-delete-supplier]').forEach(b=>b.onclick=()=>remove('suppliers',b.dataset.deleteSupplier));
